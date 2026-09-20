@@ -28,12 +28,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Topic to generate questions for (default: %(default)s).",
     )
     parser.add_argument(
-        "--temperature",
-        type=float,
-        default=None,
-        help="Sampling temperature (0.0-1.0).",
-    )
-    parser.add_argument(
         "--indent",
         type=int,
         default=2,
@@ -44,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    quiz = generate_quiz(args.topic, temperature=args.temperature)
+    quiz = generate_quiz(args.topic)
     json.dump(quiz, sys.stdout, ensure_ascii=False, indent=args.indent or None)
     sys.stdout.write("\n")
     return 0

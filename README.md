@@ -26,7 +26,7 @@ Topik yang tersedia:
 ├── .env.example
 ├── src/
 │   └── latsol_py/
-│       ├── __init__.py     # API publik paket
+│       ├── __init__.py     # docstring paket
 │       ├── __main__.py     # python -m latsol_py
 │       ├── app.py          # aplikasi FastAPI
 │       ├── cli.py          # antarmuka command line
@@ -99,7 +99,8 @@ Dokumentasi interaktif: <http://127.0.0.1:8000/docs>.
 | Method | Path | Deskripsi |
 | ------ | ---- | --------- |
 | `GET`  | `/` | Info service |
-| `GET`  | `/health` | Health check |
+| `GET`  | `/health` | Health check (liveness) |
+| `GET`  | `/ready` | Readiness — ping model, `503` bila model mati |
 | `GET`  | `/topics` | Daftar topik yang didukung |
 | `GET`  | `/quiz?topic=...` | Generate 5 soal via query string |
 | `POST` | `/quiz` | Generate 5 soal via JSON body |
@@ -240,6 +241,7 @@ curl "http://127.0.0.1:8000/quiz?topic=aljabar" -H "X-API-Key: $LATSOL_SERVICE_A
 - [ ] Setel `LATSOL_SERVICE_API_KEY` (jangan biarkan kosong).
 - [ ] Setel `LATSOL_DOCS_ENABLED=false`.
 - [ ] Jalankan di balik reverse proxy dengan TLS + rate limit per-IP.
+- [ ] Gunakan `/ready` (bukan `/health`) sebagai readiness probe load balancer.
 - [ ] Batasi `LATSOL_BASE_URL` ke endpoint yang tepercaya.
 - [ ] Jangan commit `.env` (sudah di-`.gitignore`); simpan rahasia di secret store.
 - [ ] Pantau log server (level WARNING/ERROR) untuk anomali.

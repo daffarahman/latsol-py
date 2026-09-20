@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import lru_cache
 from importlib.resources import files
 
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from .config import get_settings
 
@@ -37,7 +38,6 @@ TOPICS: tuple[str, ...] = (
     "peluang",
 )
 
-PROMPT_RESOURCE = ("data", "system_prompt.txt")
 
 # --- JSON Schema the model must obey ---
 RESPONSE_SCHEMA: dict = {
@@ -81,13 +81,30 @@ class QuizGenerationError(RuntimeError):
     """Raised when the model output is missing, malformed, or invalid."""
 
 
+@lru_cache(maxsize=1)
 def load_system_prompt() -> str:
     """Load the UTBK question-writer system prompt bundled with the package."""
-    resource = files("latsol_py").joinpath(*PROMPT_RESOURCE)
+    resource = files("latsol_py").joinpath("data", "system_prompt.txt")
     try:
         return resource.read_text(encoding="utf-8").strip()
     except FileNotFoundError as exc:  # pragma: no cover - packaging error
-        raise FileNotFoundError(f"Missing system prompt at {'.'.join(PROMPT_RESOURCE)}") from exc
+        raise FileNotFoundError("Missing system prompt at data/system_prompt.txt") from exc
+
+
+def check_upstream(timeout: float = 5.0) -> bool:
+    """Return True if the configured model endpoint responds. Used by ``/ready``."""
+    settings = get_settings()
+    client = OpenAI(
+        base_url=settings.base_url,
+        api_key=settings.api_key,
+        timeout=timeout,
+        max_retries=0,
+    )
+    try:
+        client.models.list()
+        return True
+    except OpenAIError:
+        return False
 
 
 def validate_quiz(quiz: dict) -> dict:
@@ -110,7 +127,7 @@ def validate_quiz(quiz: dict) -> dict:
     return quiz
 
 
-def generate_quiz(topic: str, temperature: float | None = None) -> dict:
+def generate_quiz(topic: str) -> dict:
     """Generate 5 multiple-choice questions for ``topic``.
 
     The model is asked up to ``LATSOL_MAX_ATTEMPTS`` times; if an attempt fails
@@ -150,7 +167,7 @@ def generate_quiz(topic: str, temperature: float | None = None) -> dict:
                     "schema": RESPONSE_SCHEMA,
                 },
             },
-            temperature=settings.temperature if temperature is None else temperature,
+            temperature=settings.temperature,
             max_tokens=settings.max_tokens,
         )
 

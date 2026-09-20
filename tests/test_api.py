@@ -26,7 +26,7 @@ def test_list_topics(client) -> None:
 
 
 def test_get_quiz(client, monkeypatch, valid_quiz) -> None:
-    monkeypatch.setattr(app_module, "generate_quiz", lambda topic, temperature=None: valid_quiz)
+    monkeypatch.setattr(app_module, "generate_quiz", lambda topic: valid_quiz)
     response = client.get("/quiz", params={"topic": "aljabar"})
     assert response.status_code == 200
     body = response.json()
@@ -36,7 +36,7 @@ def test_get_quiz(client, monkeypatch, valid_quiz) -> None:
 
 
 def test_post_quiz(client, monkeypatch, valid_quiz) -> None:
-    monkeypatch.setattr(app_module, "generate_quiz", lambda topic, temperature=None: valid_quiz)
+    monkeypatch.setattr(app_module, "generate_quiz", lambda topic: valid_quiz)
     response = client.post("/quiz", json={"topic": "peluang"})
     assert response.status_code == 200
     assert len(response.json()["questions"]) == 5
@@ -48,7 +48,7 @@ def test_unknown_topic_is_rejected(client) -> None:
 
 
 def test_generation_error_returns_502(client, monkeypatch) -> None:
-    def boom(topic: str, temperature: float | None = None) -> dict:
+    def boom(topic: str) -> dict:
         raise QuizGenerationError("model returned garbage")
 
     monkeypatch.setattr(app_module, "generate_quiz", boom)
@@ -59,7 +59,7 @@ def test_generation_error_returns_502(client, monkeypatch) -> None:
 
 
 def test_upstream_connection_error_returns_503(client, monkeypatch) -> None:
-    def boom(topic: str, temperature: float | None = None) -> dict:
+    def boom(topic: str) -> dict:
         raise APIConnectionError(request=None)
 
     monkeypatch.setattr(app_module, "generate_quiz", boom)
@@ -69,7 +69,7 @@ def test_upstream_connection_error_returns_503(client, monkeypatch) -> None:
 
 
 def test_unexpected_error_returns_generic_500(client, monkeypatch) -> None:
-    def boom(topic: str, temperature: float | None = None) -> dict:
+    def boom(topic: str) -> dict:
         raise RuntimeError("secret internal detail")
 
     monkeypatch.setattr(app_module, "generate_quiz", boom)
@@ -80,8 +80,8 @@ def test_unexpected_error_returns_generic_500(client, monkeypatch) -> None:
 
 
 def test_api_key_required_when_configured(client, monkeypatch, valid_quiz) -> None:
-    monkeypatch.setattr(app_module, "settings", Settings(service_api_key="s3cret"))
-    monkeypatch.setattr(app_module, "generate_quiz", lambda topic, temperature=None: valid_quiz)
+    monkeypatch.setattr(app_module, "get_settings", lambda: Settings(service_api_key="s3cret"))
+    monkeypatch.setattr(app_module, "generate_quiz", lambda topic: valid_quiz)
 
     assert client.get("/quiz", params={"topic": "aljabar"}).status_code == 401
     wrong = client.get("/quiz", params={"topic": "aljabar"}, headers={"X-API-Key": "nope"})
@@ -92,7 +92,7 @@ def test_api_key_required_when_configured(client, monkeypatch, valid_quiz) -> No
 
 
 def test_health_and_topics_stay_public_with_api_key(client, monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "settings", Settings(service_api_key="s3cret"))
+    monkeypatch.setattr(app_module, "get_settings", lambda: Settings(service_api_key="s3cret"))
     assert client.get("/health").status_code == 200
     assert client.get("/topics").status_code == 200
 
@@ -104,3 +104,17 @@ def test_returns_503_when_at_capacity(client, monkeypatch) -> None:
     response = client.get("/quiz", params={"topic": "aljabar"})
     assert response.status_code == 503
     assert response.headers.get("retry-after") == "5"
+
+
+def test_ready_ok(client, monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "check_upstream", lambda: True)
+    response = client.get("/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready"}
+
+
+def test_ready_when_model_is_down(client, monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "check_upstream", lambda: False)
+    response = client.get("/ready")
+    assert response.status_code == 503
+    assert response.json() == {"status": "not ready"}

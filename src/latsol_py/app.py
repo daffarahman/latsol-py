@@ -32,16 +32,13 @@ from openai import APIConnectionError, APIError
 from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .quiz import TOPICS, QuizGenerationError, generate_quiz, validate_quiz
+from .quiz import TOPICS, QuizGenerationError, check_upstream, generate_quiz
 
 logger = logging.getLogger("latsol_py")
 
-# Read once at import; tests may monkeypatch ``latsol_py.app.settings``.
-settings = get_settings()
-
 # Bound in-flight generations so a burst of requests cannot exhaust the worker
 # threadpool or run up unbounded upstream cost.
-_generation_slots = threading.BoundedSemaphore(max(1, settings.max_concurrency))
+_generation_slots = threading.BoundedSemaphore(max(1, get_settings().max_concurrency))
 
 Topic = Literal[*TOPICS]  # type: ignore[valid-type]
 
@@ -64,9 +61,6 @@ class QuizResponse(BaseModel):
 
 class QuizRequest(BaseModel):
     topic: Topic = Field(..., description="One of the supported topics.")
-    temperature: float | None = Field(
-        default=None, ge=0.0, le=1.0, description="Optional sampling temperature."
-    )
 
 
 class TopicsResponse(BaseModel):
@@ -80,7 +74,7 @@ def require_api_key(
 
     Auth is disabled (no-op) when no key is set, so local development is unchanged.
     """
-    expected = settings.service_api_key
+    expected = get_settings().service_api_key
     if expected is None:
         return
     if x_api_key is None or not secrets.compare_digest(x_api_key, expected):
@@ -106,10 +100,10 @@ def _generation_slot() -> Iterator[None]:
         _generation_slots.release()
 
 
-def _build_quiz(topic: str, temperature: float | None) -> QuizResponse:
+def _build_quiz(topic: str) -> QuizResponse:
     try:
         with _generation_slot():
-            quiz = validate_quiz(generate_quiz(topic, temperature=temperature))
+            quiz = generate_quiz(topic)  # already validated
     except QuizGenerationError as exc:
         logger.warning("Invalid quiz generated for topic %r: %s", topic, exc)
         raise HTTPException(
@@ -136,9 +130,9 @@ app = FastAPI(
     description=("Generate 5 Soal UTBK-SNBT Pengetahuan Kuantitatif (pilihan ganda) per request."),
     version="0.1.0",
     summary="Generator soal UTBK-SNBT Pengetahuan Kuantitatif.",
-    docs_url="/docs" if settings.docs_enabled else None,
-    redoc_url="/redoc" if settings.docs_enabled else None,
-    openapi_url="/openapi.json" if settings.docs_enabled else None,
+    docs_url="/docs" if get_settings().docs_enabled else None,
+    redoc_url="/redoc" if get_settings().docs_enabled else None,
+    openapi_url="/openapi.json" if get_settings().docs_enabled else None,
 )
 
 
@@ -156,7 +150,7 @@ def root() -> dict:
         "topics": "/topics",
         "endpoints": ["GET /quiz?topic=...", "POST /quiz"],
     }
-    if settings.docs_enabled:
+    if get_settings().docs_enabled:
         info["docs"] = "/docs"
     return info
 
@@ -164,6 +158,13 @@ def root() -> dict:
 @app.get("/health", summary="Health check")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/ready", summary="Readiness check (pings the model)")
+def ready() -> JSONResponse:
+    if check_upstream():
+        return JSONResponse({"status": "ready"})
+    return JSONResponse({"status": "not ready"}, status_code=503)
 
 
 @app.get("/topics", response_model=TopicsResponse, summary="List supported topics")
@@ -179,12 +180,8 @@ def list_topics() -> TopicsResponse:
 )
 def get_quiz(
     topic: Annotated[Topic, Query(description="Topic to generate questions for.")],
-    temperature: Annotated[
-        float | None,
-        Query(ge=0.0, le=1.0, description="Optional sampling temperature."),
-    ] = None,
 ) -> QuizResponse:
-    return _build_quiz(topic, temperature)
+    return _build_quiz(topic)
 
 
 @app.post(
@@ -194,7 +191,7 @@ def get_quiz(
     dependencies=[Depends(require_api_key)],
 )
 def post_quiz(request: QuizRequest) -> QuizResponse:
-    return _build_quiz(request.topic, request.temperature)
+    return _build_quiz(request.topic)
 
 
 def run() -> None:
