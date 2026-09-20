@@ -12,6 +12,7 @@ import latsol_py.quiz as quiz_module
 from latsol_py.quiz import (
     TOPICS,
     QuizGenerationError,
+    _response_format,
     generate_quiz,
     load_system_prompt,
     validate_quiz,
@@ -28,6 +29,7 @@ class FakeClient:
 
     def create(self, **kwargs: object) -> SimpleNamespace:
         self.calls += 1
+        self.last_kwargs = kwargs
         content = self._outputs.pop(0)
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
 
@@ -118,3 +120,29 @@ def test_generate_raises_after_exhausting_attempts(monkeypatch, valid_quiz) -> N
         quiz_module.generate_quiz("aljabar")
 
     assert client.calls == 2
+
+
+def test_response_format_json_schema() -> None:
+    assert _response_format("json_schema")["type"] == "json_schema"
+
+
+def test_response_format_json_object() -> None:
+    assert _response_format("json_object") == {"type": "json_object"}
+
+
+def test_response_format_none() -> None:
+    assert _response_format("none") is None
+
+
+def test_response_format_rejects_unknown() -> None:
+    with pytest.raises(ValueError, match="LATSOL_RESPONSE_FORMAT"):
+        _response_format("yaml")
+
+
+def test_generate_uses_configured_response_format(monkeypatch, valid_quiz) -> None:
+    monkeypatch.setenv("LATSOL_RESPONSE_FORMAT", "json_object")
+    client = _patch_client(monkeypatch, [json.dumps(valid_quiz)])
+
+    quiz_module.generate_quiz("aljabar")
+
+    assert client.last_kwargs["response_format"] == {"type": "json_object"}

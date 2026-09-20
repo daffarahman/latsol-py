@@ -81,6 +81,22 @@ class QuizGenerationError(RuntimeError):
     """Raised when the model output is missing, malformed, or invalid."""
 
 
+def _response_format(mode: str) -> dict | None:
+    """Map ``LATSOL_RESPONSE_FORMAT`` to a provider-appropriate value."""
+    if mode == "json_schema":
+        return {
+            "type": "json_schema",
+            "json_schema": {"name": "UTBKQuiz", "strict": True, "schema": RESPONSE_SCHEMA},
+        }
+    if mode == "json_object":
+        return {"type": "json_object"}
+    if mode == "none":
+        return None
+    raise ValueError(
+        f"LATSOL_RESPONSE_FORMAT must be json_schema, json_object, or none; got {mode!r}"
+    )
+
+
 @lru_cache(maxsize=1)
 def load_system_prompt() -> str:
     """Load the UTBK question-writer system prompt bundled with the package."""
@@ -153,23 +169,20 @@ def generate_quiz(topic: str) -> dict:
         {"role": "user", "content": f"Topik: {topic}"},
     ]
     attempts = max(1, settings.max_attempts)
+    response_format = _response_format(settings.response_format)
     last_error: QuizGenerationError | None = None
 
     for attempt in range(1, attempts + 1):
-        response = client.chat.completions.create(
-            model=settings.model,
-            messages=messages,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "UTBKQuiz",
-                    "strict": True,
-                    "schema": RESPONSE_SCHEMA,
-                },
-            },
-            temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
-        )
+        request_kwargs: dict = {
+            "model": settings.model,
+            "messages": messages,
+            "temperature": settings.temperature,
+            "max_tokens": settings.max_tokens,
+        }
+        if response_format is not None:
+            request_kwargs["response_format"] = response_format
+
+        response = client.chat.completions.create(**request_kwargs)
 
         raw = response.choices[0].message.content
         if raw:

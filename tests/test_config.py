@@ -14,6 +14,7 @@ def test_defaults_are_used_when_env_is_unset(monkeypatch) -> None:
         "LATSOL_API_KEY",
         "LATSOL_TEMPERATURE",
         "LATSOL_MAX_TOKENS",
+        "LATSOL_RESPONSE_FORMAT",
         "LATSOL_REQUEST_TIMEOUT",
         "LATSOL_MAX_RETRIES",
         "LATSOL_MAX_CONCURRENCY",
@@ -31,6 +32,7 @@ def test_environment_overrides_defaults(monkeypatch) -> None:
     monkeypatch.setenv("LATSOL_MODEL", "qwen2.5:7b")
     monkeypatch.setenv("LATSOL_TEMPERATURE", "0.9")
     monkeypatch.setenv("LATSOL_MAX_TOKENS", "2048")
+    monkeypatch.setenv("LATSOL_RESPONSE_FORMAT", "json_object")
     monkeypatch.setenv("LATSOL_REQUEST_TIMEOUT", "12.5")
     monkeypatch.setenv("LATSOL_MAX_RETRIES", "0")
     monkeypatch.setenv("LATSOL_MAX_CONCURRENCY", "8")
@@ -42,6 +44,7 @@ def test_environment_overrides_defaults(monkeypatch) -> None:
     assert settings.model == "qwen2.5:7b"
     assert settings.temperature == 0.9
     assert settings.max_tokens == 2048
+    assert settings.response_format == "json_object"
     assert settings.request_timeout == 12.5
     assert settings.max_retries == 0
     assert settings.max_concurrency == 8

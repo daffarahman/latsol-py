@@ -65,6 +65,12 @@ class Settings:
     temperature: float = 0.4
     max_tokens: int = 4096
 
+    # How to request JSON from the model. Providers differ:
+    # - "json_schema": strict structured outputs (Ollama, OpenAI, some DeepInfra models)
+    # - "json_object": JSON mode only (DeepSeek and many others)
+    # - "none": rely on the prompt alone
+    response_format: str = "json_schema"
+
     # Upstream LLM client behaviour.
     request_timeout: float = 30.0
     max_retries: int = 1
@@ -93,6 +99,7 @@ def get_settings() -> Settings:
         api_key=os.getenv("LATSOL_API_KEY", _DEFAULTS.api_key),
         temperature=_env_float("LATSOL_TEMPERATURE", _DEFAULTS.temperature),
         max_tokens=_env_int("LATSOL_MAX_TOKENS", _DEFAULTS.max_tokens),
+        response_format=os.getenv("LATSOL_RESPONSE_FORMAT", _DEFAULTS.response_format),
         request_timeout=_env_float("LATSOL_REQUEST_TIMEOUT", _DEFAULTS.request_timeout),
         max_retries=_env_int("LATSOL_MAX_RETRIES", _DEFAULTS.max_retries),
         max_attempts=_env_int("LATSOL_MAX_ATTEMPTS", _DEFAULTS.max_attempts),

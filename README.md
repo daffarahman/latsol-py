@@ -162,12 +162,45 @@ Daftar variabel (lihat `src/latsol_py/config.py`):
 | `LATSOL_API_KEY` | `ollama` | API key upstream |
 | `LATSOL_TEMPERATURE` | `0.4` | Temperatur sampling |
 | `LATSOL_MAX_TOKENS` | `4096` | Batas token output |
+| `LATSOL_RESPONSE_FORMAT` | `json_schema` | Mode JSON: `json_schema`, `json_object`, atau `none` |
 | `LATSOL_REQUEST_TIMEOUT` | `30` | Timeout request ke model (detik) |
 | `LATSOL_MAX_RETRIES` | `1` | Jumlah retry transport ke model |
 | `LATSOL_MAX_ATTEMPTS` | `2` | Berapa kali model diminta ulang saat output gagal validasi |
 | `LATSOL_MAX_CONCURRENCY` | `4` | Maksimal generasi bersamaan (lebih → HTTP 503) |
 | `LATSOL_SERVICE_API_KEY` | _(kosong)_ | Jika diisi, `/quiz` wajib header `X-API-Key` |
 | `LATSOL_DOCS_ENABLED` | `true` | Set `false` di produksi untuk menyembunyikan `/docs` |
+
+### Menggunakan provider lain
+
+Layanan ini memakai API yang kompatibel dengan OpenAI, jadi cukup ubah `.env`.
+Yang perlu disesuaikan adalah mode JSON (`LATSOL_RESPONSE_FORMAT`) mengikuti
+dukungan provider.
+
+**DeepSeek** — hanya mendukung JSON mode (`json_object`), bukan `json_schema`:
+
+```bash
+LATSOL_BASE_URL=https://api.deepseek.com/v1
+LATSOL_API_KEY=sk-...
+LATSOL_MODEL=deepseek-chat
+LATSOL_RESPONSE_FORMAT=json_object
+```
+
+**DeepInfra** — dukungan `json_schema` tergantung model; jika gagal, pakai
+`json_object`:
+
+```bash
+LATSOL_BASE_URL=https://api.deepinfra.com/v1/openai
+LATSOL_API_KEY=...
+LATSOL_MODEL=deepseek-ai/DeepSeek-V3
+LATSOL_RESPONSE_FORMAT=json_schema
+```
+
+Catatan:
+
+- Bila respons terpotong, naikkan `LATSOL_MAX_TOKENS`.
+- Karena endpoint kini memanggil provider berbayar, aktifkan
+  `LATSOL_SERVICE_API_KEY` dan rate limit (lihat bagian Keamanan).
+- `GET /ready` memanggil `GET /models`; sebagian provider mendukungnya.
 
 ## Keamanan
 
