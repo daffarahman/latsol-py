@@ -69,6 +69,9 @@ class Settings:
     request_timeout: float = 30.0
     max_retries: int = 1
 
+    # Number of times to re-ask the model when its output fails validation.
+    max_attempts: int = 2
+
     # Server-side protections.
     max_concurrency: int = 4
     service_api_key: str | None = None
@@ -92,6 +95,7 @@ def get_settings() -> Settings:
         max_tokens=_env_int("LATSOL_MAX_TOKENS", _DEFAULTS.max_tokens),
         request_timeout=_env_float("LATSOL_REQUEST_TIMEOUT", _DEFAULTS.request_timeout),
         max_retries=_env_int("LATSOL_MAX_RETRIES", _DEFAULTS.max_retries),
+        max_attempts=_env_int("LATSOL_MAX_ATTEMPTS", _DEFAULTS.max_attempts),
         max_concurrency=_env_int("LATSOL_MAX_CONCURRENCY", _DEFAULTS.max_concurrency),
         service_api_key=_env_optional("LATSOL_SERVICE_API_KEY"),
         docs_enabled=_env_bool("LATSOL_DOCS_ENABLED", _DEFAULTS.docs_enabled),
