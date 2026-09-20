@@ -24,4 +24,6 @@ def valid_quiz() -> dict:
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    # raise_server_exceptions=False so the generic 500 handler is exercised
+    # instead of the exception propagating into the test.
+    return TestClient(app, raise_server_exceptions=False)

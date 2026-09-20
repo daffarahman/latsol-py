@@ -106,7 +106,12 @@ def generate_quiz(topic: str, temperature: float | None = None) -> dict:
         raise ValueError(f"Unknown topic {topic!r}. Choose one of: {', '.join(TOPICS)}")
 
     settings = get_settings()
-    client = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
+    client = OpenAI(
+        base_url=settings.base_url,
+        api_key=settings.api_key,
+        timeout=settings.request_timeout,
+        max_retries=settings.max_retries,
+    )
 
     response = client.chat.completions.create(
         model=settings.model,

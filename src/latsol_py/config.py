@@ -38,6 +38,23 @@ def _env_int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer, got {value!r}") from exc
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalised = value.strip().lower()
+    if normalised in {"1", "true", "yes", "on"}:
+        return True
+    if normalised in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean, got {value!r}")
+
+
+def _env_optional(name: str) -> str | None:
+    value = os.getenv(name)
+    return value or None
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     """Immutable application settings."""
@@ -47,6 +64,15 @@ class Settings:
     api_key: str = "ollama"
     temperature: float = 0.4
     max_tokens: int = 4096
+
+    # Upstream LLM client behaviour.
+    request_timeout: float = 30.0
+    max_retries: int = 1
+
+    # Server-side protections.
+    max_concurrency: int = 4
+    service_api_key: str | None = None
+    docs_enabled: bool = True
 
 
 # A default instance is used as the source of fallback values. With ``slots=True``
@@ -64,4 +90,9 @@ def get_settings() -> Settings:
         api_key=os.getenv("LATSOL_API_KEY", _DEFAULTS.api_key),
         temperature=_env_float("LATSOL_TEMPERATURE", _DEFAULTS.temperature),
         max_tokens=_env_int("LATSOL_MAX_TOKENS", _DEFAULTS.max_tokens),
+        request_timeout=_env_float("LATSOL_REQUEST_TIMEOUT", _DEFAULTS.request_timeout),
+        max_retries=_env_int("LATSOL_MAX_RETRIES", _DEFAULTS.max_retries),
+        max_concurrency=_env_int("LATSOL_MAX_CONCURRENCY", _DEFAULTS.max_concurrency),
+        service_api_key=_env_optional("LATSOL_SERVICE_API_KEY"),
+        docs_enabled=_env_bool("LATSOL_DOCS_ENABLED", _DEFAULTS.docs_enabled),
     )

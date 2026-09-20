@@ -122,9 +122,31 @@ Daftar variabel (lihat `src/latsol_py/config.py`):
 | -------- | ------- | ---------- |
 | `LATSOL_MODEL` | `llama3.1:8b` | Nama model |
 | `LATSOL_BASE_URL` | `http://localhost:11434/v1` | Base URL OpenAI-compatible |
-| `LATSOL_API_KEY` | `ollama` | API key |
+| `LATSOL_API_KEY` | `ollama` | API key upstream |
 | `LATSOL_TEMPERATURE` | `0.4` | Temperatur sampling |
 | `LATSOL_MAX_TOKENS` | `4096` | Batas token output |
+| `LATSOL_REQUEST_TIMEOUT` | `30` | Timeout request ke model (detik) |
+| `LATSOL_MAX_RETRIES` | `1` | Jumlah retry ke model |
+| `LATSOL_MAX_CONCURRENCY` | `4` | Maksimal generasi bersamaan (lebih → HTTP 503) |
+| `LATSOL_SERVICE_API_KEY` | _(kosong)_ | Jika diisi, `/quiz` wajib header `X-API-Key` |
+| `LATSOL_DOCS_ENABLED` | `true` | Set `false` di produksi untuk menyembunyikan `/docs` |
+
+## Keamanan
+
+- **Topik adalah allowlist.** `topic` divalidasi sebagai `Literal` berisi 8 topik
+  tetap, dan `generate_quiz()` memeriksa ulang keanggotaannya. Tidak ada teks
+  bebas dari pengguna yang masuk ke prompt, sehingga prompt injection lewat
+  topik tidak mungkin. Field tubuh request lain diabaikan oleh Pydantic.
+- **Autentikasi opsional.** Setel `LATSOL_SERVICE_API_KEY` untuk mewajibkan
+  header `X-API-Key` pada endpoint `/quiz`. `/health` dan `/topics` tetap publik.
+- **Pembatas konkurensi.** `LATSOL_MAX_CONCURRENCY` membatasi jumlah generasi
+  bersamaan; kelebihannya dibalas HTTP 503 + `Retry-After`.
+- **Timeout & retry** ke model dibatasi (`LATSOL_REQUEST_TIMEOUT`, `LATSOL_MAX_RETRIES`).
+- **Pesan error generik.** Detail internal hanya masuk log server, bukan respons.
+- **Dokumentasi** dapat dimatikan di produksi via `LATSOL_DOCS_ENABLED=false`.
+
+> Jika nanti menambahkan topik bebas (free text), prompt injection kembali
+> terbuka: batasi panjangnya, buang karakter kontrol, dan jaga di dalam template ketat.
 
 ## Pengembangan
 
